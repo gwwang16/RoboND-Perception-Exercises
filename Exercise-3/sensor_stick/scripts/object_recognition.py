@@ -28,25 +28,47 @@ def pcl_callback(pcl_msg):
     # TODO: Convert ROS msg to PCL data
     cloud = ros_to_pcl(pcl_msg)
 
+    # TODO: Statistical Outlier Filtering
+    # Create statistical outlier filter object
+    outlier_filter = cloud.make_statistical_outlier_filter()
+    # Set the number of neighboring points
+    outlier_filter.set_mean_k(10)
+    # Set threshold scale factor
+    x = 1.0
+    # Mean distance larger than (mean distance+x*std_dev) will be considered as outlier
+    outlier_filter.set_std_dev_mul_thresh(x)
+    cloud_filtered = outlier_filter.filter()
+
     # TODO: Voxel Grid Downsampling
     # Create a voxelgrid filter object for our input point cloud
-    vox = cloud.make_voxel_grid_filter()
+    vox = cloud_filtered.make_voxel_grid_filter()
     # Choose a voxel size (leaf size)
-    LEAF_SIZE = 0.01
+    LEAF_SIZE = 0.005
     # Set the voxel size
     vox.set_leaf_size(LEAF_SIZE, LEAF_SIZE, LEAF_SIZE)
     cloud_filtered = vox.filter()
 
-    # TODO: PassThrough Filter
+    # TODO: PassThrough Filter in z axis
     passthrough = cloud_filtered.make_passthrough_filter()
     # Assign axis and range to the passthrough filter object
     filter_axis = 'z'
     passthrough.set_filter_field_name(filter_axis)
     axis_min = 0.6
-    axis_max = 1.1
+    axis_max = 1.0
     passthrough.set_filter_limits(axis_min, axis_max)
     # Finally use the filter function to obtain the resultant point cloud.
     cloud_filtered = passthrough.filter()
+
+    # TODO: PassThrough Filter in y axis
+    passthrough_y = cloud_filtered.make_passthrough_filter()
+    # Assign axis and range to the passthrough filter object
+    filter_axis = 'y'
+    passthrough_y.set_filter_field_name(filter_axis)
+    axis_min = -0.5
+    axis_max = 0.5
+    passthrough_y.set_filter_limits(axis_min, axis_max)
+    # Finally use the filter function to obtain the resultant point cloud.
+    cloud_filtered = passthrough_y.filter()
 
     # TODO: RANSAC Plane Segmentation
     # Create the segmentation object
@@ -71,13 +93,14 @@ def pcl_callback(pcl_msg):
     ec = white_cloud.make_EuclideanClusterExtraction()
     # Set tolerances for distance threshold
     # as well as minimum and maximum cluster size (in points)
-    ec.set_ClusterTolerance(0.05)
-    ec.set_MinClusterSize(100)
-    ec.set_MaxClusterSize(5000)
+    ec.set_ClusterTolerance(0.01)
+    ec.set_MinClusterSize(200)
+    ec.set_MaxClusterSize(3000)
     # Search the k-d tree for clusters
     ec.set_SearchMethod(tree)
     # Extract indices for each of the discovered clusters
     cluster_indices = ec.Extract()
+    # print(cluster_indices)
 
     # TODO: Create Cluster-Mask Point Cloud to visualize each cluster separately
     # cluster_mask = np.zeros_like()
@@ -96,15 +119,14 @@ def pcl_callback(pcl_msg):
     cluster_cloud.from_list(color_cluster_point_list)
 
     # TODO: Convert PCL data to ROS messages
-    pcl_objects = pcl_to_ros(cloud_objects)
-    pcl_table = pcl_to_ros(cloud_table)
+    ros_pcl_objects = pcl_to_ros(cloud_objects)
+    ros_pcl_table = pcl_to_ros(cloud_table)
     ros_cluster_cloud = pcl_to_ros(cluster_cloud)
 
     # TODO: Publish ROS messages
-    # detected_objects_pub.publish(pcl_objects)
-    # pcl_objects_pub.publish(pcl_objects)
-    # pcl_table_pub.publish(pcl_table)
-    # pcl_cluster_pub.publish(ros_cluster_cloud)
+    pcl_objects_pub.publish(ros_pcl_objects)
+    pcl_table_pub.publish(ros_pcl_table)
+    pcl_cluster_pub.publish(ros_cluster_cloud)
 
 # Exercise-3 TODOs: 
 
@@ -149,9 +171,13 @@ if __name__ == '__main__':
     rospy.init_node('object_markers_pub', anonymous=True)
 
     # TODO: Create Subscribers
-    pcl_sub = rospy.Subscriber("/sensor_stick/point_cloud", pc2.PointCloud2, pcl_callback, queue_size=1)
+    pcl_sub = rospy.Subscriber("/pr2/world/points", pc2.PointCloud2, pcl_callback, queue_size=1)
     
     # TODO: Create Publishers
+    pcl_objects_pub = rospy.Publisher("/pcl_objects", PointCloud2, queue_size=1)
+    pcl_table_pub = rospy.Publisher("/pcl_table", PointCloud2, queue_size=1)
+    pcl_cluster_pub = rospy.Publisher("/pcl_cluster", PointCloud2, queue_size=1)
+    
     object_markers_pub = rospy.Publisher("/object_markers", Marker, queue_size=1)
     detected_objects_pub = rospy.Publisher("/detected_objects", DetectedObjectsArray, queue_size=1)
 

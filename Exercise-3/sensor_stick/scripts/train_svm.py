@@ -7,6 +7,8 @@ from sklearn import svm
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn import cross_validation
 from sklearn import metrics
+from sklearn.grid_search import GridSearchCV
+from sklearn.metrics import f1_score
 
 def plot_confusion_matrix(cm, classes,
                           normalize=False,
@@ -61,9 +63,34 @@ y_train = np.array(label_list)
 encoder = LabelEncoder()
 y_train = encoder.fit_transform(y_train)
 
+
+# # Initialize the classifier
+# clf = svm.SVC()
+# # Create the parameters list you wish to tune
+# parameters = {'kernel':('linear', 'rbf', 'sigmoid'), 
+#               'C':[1, 3, 5, 7, 10, 15, 20, 25],
+#               'class_weight':['balanced', None],
+#               'random_state': [1, None]}
+
+# kf = cross_validation.KFold(len(X_train),
+#                             n_folds=5,
+#                             shuffle=True,
+#                             random_state=1)
+
+# grid_obj = GridSearchCV(clf, parameters, scoring='r2')
+# # Fit the grid search object to the training data and find the optimal parameters
+# grid_obj = grid_obj.fit(X_train, y_train)
+# # Get the estimator
+# clf = grid_obj.best_estimator_
+# scores = grid_obj.best_score_
+# best_params = grid_obj.best_params_
+# print('Scores: ' + str(scores))
+# print('Accuracy_r2: %0.2f' % (scores))
+# print("Parameters", (best_params))
+
 # Create classifier
-# clf = svm.SVC(kernel='linear')
-clf = svm.LinearSVC(penalty='l2', loss='squared_hinge', dual=False, tol=1e-3)
+# clf = svm.SVC(C=15.0, kernel='rbf', gamma=0.008)
+clf = svm.LinearSVC(penalty='l2', loss='squared_hinge', dual=False, tol=1e-4)
 
 # Set up 5-fold cross-validation
 kf = cross_validation.KFold(len(X_train),
@@ -76,25 +103,24 @@ scores = cross_validation.cross_val_score(cv=kf,
                                          estimator=clf,
                                          X=X_train, 
                                          y=y_train,
-                                         scoring='accuracy'
+                                         scoring='r2'
                                         )
 print('Scores: ' + str(scores))
-print('Accuracy: %0.2f (+/- %0.2f)' % (scores.mean(), 2*scores.std()))
+print('Accuracy_r2: %0.2f (+/- %0.2f)' % (scores.mean(), 2*scores.std()))
 
 # Gather predictions
 predictions = cross_validation.cross_val_predict(cv=kf,
                                           estimator=clf,
                                           X=X_train, 
-                                          y=y_train
-                                         )
+                                          y=y_train)
 
 accuracy_score = metrics.accuracy_score(y_train, predictions)
+# accuracy_score = metrics.r2_score(y_train, predictions)
 print('accuracy score: '+str(accuracy_score))
 
 confusion_matrix = metrics.confusion_matrix(y_train, predictions)
 
 class_names = encoder.classes_.tolist()
-
 
 #Train the classifier
 clf.fit(X=X_train, y=y_train)
